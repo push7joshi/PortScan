@@ -14,6 +14,7 @@
 #include<string>
 #include<ifaddrs.h>
 #include<net/if.h>
+#include<algorithm>
 
 #ifndef   NI_MAXHOST
 #define   NI_MAXHOST 1025
@@ -48,6 +49,12 @@ enum ScanType{
     UDP
 };
 
+inline string stringUpper(char * lString){
+    string uString = string (lString);
+    transform(uString.begin(), uString.end(), uString.begin(), :: toupper);
+    return uString;
+}
+
 
 /* callback function that is passed to pcap_loop(..) and called each time
  * a packet is recieved                                                    */
@@ -56,27 +63,37 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
 {
     cout<<"Pkt Length:"<<pkthdr->len<<endl;
     cout<<"Hdr Length:"<<pkthdr->caplen<<endl;
-    struct ip* ip;
-    struct tcphdr* tcp;
+    struct ip* ipHeader;
+    struct tcphdr* tcpHeader;
 
-    ip = (struct ip*)(packet + sizeof(struct ethernet_h));
+    ipHeader = (struct ip*)(packet + sizeof(struct ethernet_h));
+    struct protoent* protoEntry = getprotobynumber(ipHeader->ip_p);
+    string proto;
+    if (protoEntry == NULL) {
+        cout<<"errProto"<<endl;
+    } else {
+        proto = stringUpper(protoEntry->p_name);
+        cout<<proto<<endl;
+    }
+
+    cout<<Port<<endl;
+    struct servent * service = getservbyport(htons(Port), protoEntry->p_name);
+    cout<<stringUpper(service->s_name)<<endl;
+
     cout<<"\nIP src:\t";
     char ackIp[30];
-    string ipToScan = string(inet_ntop(AF_INET, &(ip->ip_src), ackIp, INET_ADDRSTRLEN));
+    string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
     cout<<ipToScan<<endl;
-    cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ip->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
-
-    //exit(0);
+    cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ipHeader->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
 }
 
 
-int capturePacket(int numPackets,int port, string ipToScan)
+pcap_t* setupCapture(int port, string ipToScan)
 {
     int i;
     char *dev;
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t* handle;
-    const u_char *packet;
     struct pcap_pkthdr hdr;     // pcap.h
     struct ether_header *eptr;  // net/ethernet.h
     struct  bpf_program filter;
@@ -87,9 +104,11 @@ int capturePacket(int numPackets,int port, string ipToScan)
     if(dev == NULL)
     { printf("%s\n",errbuf); exit(1); }
 
+    cout<<dev<<endl;
+
     pcap_lookupnet(dev,&netp,&maskp,errbuf); //get the net address and mask
 
-    handle = pcap_open_live(dev,BUFSIZ,0,100,errbuf); //open the device for capture
+    handle = pcap_open_live(dev, BUFSIZ, 0, 0, errbuf); //open the device for capture
     if(handle == NULL)
     { printf("pcap_open_live(): %s\n",errbuf); exit(1); }
 
@@ -116,13 +135,43 @@ int capturePacket(int numPackets,int port, string ipToScan)
     } else {
         cout<<"filtered\n"<<endl;
     }
-    cout<<"numpacks:"<<numPackets<<endl;
+    return handle;
+}
+//const u_char* packet = pcap_next(handle, &hdr);
+/*const u_char** data;
+  pcap_pkthdr *pk_hdr = &hdr;
+  int retValue = pcap_next_ex(handle, &pk_hdr , data);
 
-    /* Grab a packet */
-    packet = pcap_next(handle, &hdr);
-    /* Print its length */
-    printf("Jacked a packet with length of [%d]\n", hdr.len);
-    /* And close the session */
+  if(retValue < 0)
+  exit(EXIT_FAILURE);*/
+
+/*if(packet == NULL){
+  cout<<string(pcap_geterr(handle))<<endl;
+  pcap_perror(handle, "This is the err");
+  cout<<"none"<<endl;
+  exit(EXIT_FAILURE);
+  }*/
+
+
+//printf("Jacked a packet with length of [%d]\n", hdr.len);
+//
+int capturePacket(pcap_t *handle){
+    if(pcap_loop(handle, 1, my_callback, NULL) < 0){
+        cout<<"errr"<<endl;
+        exit(1);
+    }
+    /* 
+       struct ip *ipHeader;
+       struct tcphdr *tcpHeader;
+
+       ipHeader = (struct ip*)(packet+ sizeof(struct ethernet_h));
+
+       cout<<"\nIP src:\t";
+       char ackIp[30];
+       string ipToScan1 = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
+       cout<<ipToScan1<<endl;
+       cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ipHeader->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
+       */
     pcap_close(handle);
     return(0);
 }
@@ -166,19 +215,6 @@ unsigned short in_cksum_tcp(int src, int dst, unsigned short *addr, int len)
     ans = in_cksum((unsigned short *)&buf, 12 + len);
     return (ans);
 }
-/*
-void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len, 
-               struct sk_buff *skb)
-{
-    if (skb->ip_summed == CHECKSUM_HW) {
-        th->check = ~tcp_v4_check(th, len, sk->saddr, sk->daddr, 0);
-        skb->csum = offsetof(struct tcphdr, check);
-    } else {
-        th->check = tcp_v4_check(th, len, sk->saddr, sk->daddr,
-                     csum_partial((char *)th, th->doff<<2, skb->csum));
-    }
-}
-*/
 
 unsigned short csum(unsigned short *buf, int nwords)
 {
@@ -313,26 +349,22 @@ void packetSendRecv(char sendOrRecv, string ipToScan, ScanType scan)
         if (i < 0){
             cout<<"Cannot set socket options\n";
         }
+
+        cout<<"Scanning IP "<<ipToScan<<"..."<<endl;
+        pcap_t *handle = setupCapture(stSockAddr.sin_port, ipToScan);
         while(1){
             if(sendto(socketFD, buffer, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *) &stSockAddr, sizeof(stSockAddr)) < 0){
                 cout<<"\n\n\nError sending packet data\n";
                 cout<<errno<<endl<<strerror(errno);
                 exit(EXIT_FAILURE);
             } else {
-                cout<<"sending out data\n";
-                //Capture ack from host being scanned.
-                char scannedIp[30];
-                string ipToScan1 = string(inet_ntop(AF_INET, &(stSockAddr.sin_addr), scannedIp, INET_ADDRSTRLEN));
-                capturePacket(1, stSockAddr.sin_port, ipToScan1);
-            }
-        }
-    } else {
-        cout<<"Waiting for data"<<endl;
-        if(recvfrom(socketFD, buffer, sizeof(buffer), 0,(struct sockaddr*)&stSockAddr, sizeof(stSockAddr) < 0)){
-            cout<<"Error recieving data\n";
-            exit(EXIT_FAILURE);
-        } else {
-            cout<<"This is the buffer:\n"<<buffer;
+                if(pcap_loop(handle, 1, my_callback, NULL) < 0){
+                    cout<<"errr"<<endl;
+                    exit(1);
+                } else {
+                    pcap_close(handle);
+                }
+            }       
         }
     }
 }
