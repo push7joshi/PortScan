@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fstream>
+
 using namespace std;
 
 #define TCP_SYN 0
@@ -18,10 +19,12 @@ using namespace std;
 
 struct ps_args_t {
 	vector<int> ports;
-	vector<in_addr> ip;
+	vector<string> ip;
 	int num_threads;
-	bool scans[6];
+	vector<string> scans;
 	string prefix;
+	vector<int>::iterator port_iterator;
+	vector<string>::iterator ip_iterator;
 };
 
 void usage() {
@@ -36,7 +39,7 @@ void usage() {
 }
 void get_ports(vector<int> &ports, char* string) {
 	ports = vector<int>();
-	int prev;
+	int prev = 0;
 	char * next;
 	while (1) {
 		int position = strtol(string, &next, 10);
@@ -64,7 +67,7 @@ void get_ports(vector<int> &ports, char* string) {
 
 	}
 }
-void read_ip_from_file(vector<in_addr> &ip_list, char* file_name) {
+void read_ip_from_file(vector<string> &ip_list, char* file_name) {
 	fstream in;
 	string str;
 	in.open(file_name);
@@ -76,17 +79,18 @@ void read_ip_from_file(vector<in_addr> &ip_list, char* file_name) {
 	while (in) {
 		in_addr iaddr;
 		inet_pton(AF_INET, str.c_str(), &iaddr);
-		ip_list.push_back(iaddr);
+		ip_list.push_back(str);
 		getline(in, str);
 	}
 }
 
 void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 	ps_args.ports = vector<int>(1, -1);
-	ps_args.ip = vector<in_addr>();
+	ps_args.ip = vector<string>();
 	ps_args.num_threads = 1;
 	ps_args.prefix = string();
-	memset(ps_args.scans, 0, sizeof(ps_args.scans));
+	//(ps_args.scans, 0, sizeof(ps_args.scans));
+	ps_args.scans = vector<string>();
 	/*
 	 --help <display invocation options>. Example: ”./portScanner --help”.
 	 --ports <ports to scan>. Example: ”./portScanner --ports 1,2,3-5”.
@@ -106,7 +110,8 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 	int scans_flag = 0;
 	int option_index = 0;
 	string opt;
-	while ((ch = getopt_long_only(argc, argv, "hi:f:r:p:t:s:", long_options,
+	int curr = 0;
+	while ((ch = getopt_long_only(argc, argv, "i:f:r:p:t:s:h", long_options,
 			&option_index)) != -1) {
 		switch (ch) {
 		case 'h': //help
@@ -118,7 +123,7 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 				  //usage(stdout);
 			in_addr iaddr;
 			inet_pton(AF_INET, optarg, &iaddr);
-			ps_args.ip.push_back(iaddr);
+			ps_args.ip.push_back(optarg);
 //			cout << "i " << ps_args.ip[0].s_addr << "\n";
 			//exit(0);
 			break;
@@ -141,12 +146,12 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 		case 'p': //help
 			//usage(stdout);
 
-			/*cout << "included ports\n";
-			 get_ports(ps_args.ports, optarg);
-			 for (vector<int>::iterator it = ps_args.ports.begin();
-			 it != ps_args.ports.end(); ++it) {
-			 cout << " " << *it << " \n";
-			 }*/
+			cout << "included ports\n";
+			get_ports(ps_args.ports, optarg);
+			for (vector<int>::iterator it = ps_args.ports.begin();
+					it != ps_args.ports.end(); ++it) {
+				cout << " " << *it << " \n";
+			}
 			break;
 		case 't': //help
 				  //usage(stdout);
@@ -156,49 +161,102 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			break;
 		case 's': //help
 			//usage(stdout);
-			scans_flag = 1;
-			char UDP_C[] = "UDP\0";
-			char FIN_C[] = "FIN_C\0";
-			char TCP_SYN_C[] = "SYN\0";
-			char XMAS_C[] = "XMAS\0";
-			char TCP_ACK_C[] = "ACK\0";
-			char TCP_NULL_C[] = "NULL\0";
-			int curr = optind - 1;
+			cout << "dadafsd\n";
+			/*scans_flag = 1;
+			 char UDP_C[] = "UDP\0";
+			 char FIN_C[] = "FIN_C\0";
+			 char TCP_SYN_C[] = "SYN\0";
+			 char XMAS_C[] = "XMAS\0";
+			 char TCP_ACK_C[] = "ACK\0";
+			 char TCP_NULL_C[] = "NULL\0";
+			 */
+			curr = optind - 1;
 			for (; curr < argc && argv[curr] != "-"; curr++) {
-				if (strcmp(optarg, UDP_C) == 0) {
-					ps_args.scans[UDP] = 1;
-				} else if (strcmp(optarg, FIN_C) == 0) {
-					ps_args.scans[FIN] = 1;
-				} else if (strcmp(optarg, TCP_SYN_C) == 0) {
-					ps_args.scans[TCP_SYN] = 1;
-				} else if (strcmp(optarg, XMAS_C) == 0) {
-					ps_args.scans[XMAS] = 1;
-				} else if (strcmp(optarg, TCP_ACK_C) == 0) {
-					ps_args.scans[TCP_ACK] = 1;
-				} else if (strcmp(optarg, TCP_NULL_C) == 0) {
-					ps_args.scans[TCP_NULL] = 1;
-				}
+				ps_args.scans.push_back(optarg);
+				/*	if (strcmp(optarg, UDP_C) == 0) {
+				 ps_args.scans[UDP] = 1;
+				 } else if (strcmp(optarg, FIN_C) == 0) {
+				 ps_args.scans[FIN] = 1;
+				 } else if (strcmp(optarg, TCP_SYN_C) == 0) {
+				 ps_args.scans[TCP_SYN] = 1;
+				 } else if (strcmp(optarg, XMAS_C) == 0) {
+				 ps_args.scans[XMAS] = 1;
+				 } else if (strcmp(optarg, TCP_ACK_C) == 0) {
+				 ps_args.scans[TCP_ACK] = 1;
+				 } else if (strcmp(optarg, TCP_NULL_C) == 0) {
+				 ps_args.scans[TCP_NULL] = 1;
+				 }*/
 			}
 			break;
-			//			cout << option_index << "    " << argv[optind + 1] << "\n";
-			//exit(0);			break;
+		default:
+			break;
 		}
-		if (scans_flag == 0) { //default case of no scans being specified
-			int i = 0;
-			for (i = 0; i < 6; i++) {
-				ps_args.scans[i] = 1;
+
+	}
+}
+;
+
+void get_next_ip_port(ps_args_t &ps_args, string &ip, int &port) {
+	//synchronized
+	ip = "finish";
+	port = -1;
+	while (1) {
+		if (ps_args.port_iterator == ps_args.ports.end()) {
+			ps_args.ip_iterator++;
+			cout << "end of port list\n";
+			ps_args.port_iterator = ps_args.ports.begin();
+			if (ps_args.ip_iterator == ps_args.ip.end()) {
+				//end of queue..... no more jobs
+				cout << "end of ip list\n";
+				return;
 			}
+		} else {
+			cout << "asdasdasd\n";
+			ip = *(ps_args.ip_iterator);
+			port = *(ps_args.port_iterator);
+			ps_args.port_iterator++;
+			ps_args.ip_iterator;
+			return;
+		}
+	}
+	//end of synchronized
+}
+
+void perform_scan(ps_args_t &ps_args) {
+	string ip = "ip";
+	int port = 0;
+	while (ip != "finish" && port != -1) {
+		get_next_ip_port(ps_args, ip, port);
+		for (vector<string>::iterator s = ps_args.scans.begin();
+				s != ps_args.scans.end(); ++s) {
+
+			cout << ip << "\t" << port << "\t" << *s;
 		}
 	}
 }
-
 int main(int argc, char * argv[]) {
+	cout << "a;jfnsdlkffjsdofkjasoibhgasduiofgasiugfjaofidfufd\n";
 	ps_args_t ps_args;
 	parse_args(ps_args, argc, argv);
-	for(iterator i = ps_args.ip.begin();i!=ps_args.ip.end(); ++i){
-		for(iterator j = ps_args.ports.begin; ps_args.ports.end(); ++j){
-			cout << "start scans for "<<i.s_addr;
+	ps_args.ip_iterator = ps_args.ip.begin();
+	//ps_args.ip_iterator = ps_args.ip_iterator+1;
+	ps_args.port_iterator = ps_args.ports.begin();
+	//ps_args.port_iterator++;
+	vector<int>::iterator k = ps_args.ports.begin();
 
-		}
-	}
+	///cout<<"dasdasdafs"<<*(k)<<"\n";
+	//cout << "kgmblkdfmgod\n";
+//	/cout<<"skkdmasd"<<*(ps_args.ip.begin()+1)<<"\n";
+	cout << "first" << *(ps_args.ip_iterator) << "\t\n";
+	cout << *(ps_args.port_iterator) << "\n";
+	perform_scan(ps_args);
+	/*for (vector<string>::iterator i = ps_args.ip.begin(); i != ps_args.ip.end();
+	 ++i) {
+
+	 for (vector<int>::iterator j = ps_args.ports.begin();
+	 j != ps_args.ports.end(); ++j) {
+	 cout << "ip" << *i << "\tport" << *j << "\n";
+	 //			perform_scan(k.s_addr, *j);
+	 }
+	 }*/
 }
