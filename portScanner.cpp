@@ -195,4 +195,10 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 int main(int argc, char * argv[]) {
 	ps_args_t ps_args;
 	parse_args(ps_args, argc, argv);
+	for(iterator i = ps_args.ip.begin();i!=ps_args.ip.end(); ++i){
+		for(iterator j = ps_args.ports.begin; ps_args.ports.end(); ++j){
+			cout << "start scans for "<<i.s_addr;
+
+		}
+	}
 }

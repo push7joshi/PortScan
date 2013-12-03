@@ -20,6 +20,7 @@
 #define   NI_MAXHOST 1025
 #endif
 
+#define RETRIES 3
 using namespace std;
 
 int Port = 80;
@@ -87,6 +88,7 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
     string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
     cout<<ipToScan<<endl;
     cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ipHeader->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
+
     bool isICMP, isTCP;
     if(ipHeader->ip_p == IPPROTO_TCP) isTCP = true;
     if(ipHeader->ip_p == IPPROTO_ICMP) isICMP = true;
@@ -165,17 +167,17 @@ pcap_t* setupCapture(int port, string ipToScan)
 
     pcap_lookupnet(dev,&netp,&maskp,errbuf); //get the net address and mask
 
-    handle = pcap_open_live(dev, BUFSIZ, 0, 0, errbuf); //open the device for capture
+    handle = pcap_open_live(dev, BUFSIZ, 0, 100, errbuf); //open the device for capture
     if(handle == NULL)
     { printf("pcap_open_live(): %s\n",errbuf); exit(1); }
 
     // Set the packet filter
     string filter_str = "src host ";
     filter_str.append(ipToScan);
-    filter_str.append(" and port ");
-    char portToScan[5];
-    sprintf(portToScan, "%d", Port);
-    filter_str.append(portToScan);
+    //filter_str.append(" and port ");
+    //char portToScan[5];
+    //sprintf(portToScan, "%d", Port);
+    //filter_str.append(portToScan);
     cout<<"The filter expn is :"<<filter_str<<endl;
     char fltr_str[1000];
     sprintf(fltr_str, filter_str.c_str());
@@ -208,6 +210,11 @@ pcap_t* setupCapture(int port, string ipToScan)
   cout<<"none"<<endl;
   exit(EXIT_FAILURE);
   }*/
+
+
+//printf("Jacked a packet with length of [%d]\n", hdr.len);
+//
+
 
 unsigned short in_cksum(unsigned short *addr, int len)
 
@@ -273,19 +280,19 @@ struct in_addr getMyAddress(){
     dummy.sin_port = htons(80);
 
     int descr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(descr < 0){ 
+    if(descr < 0){
         cout<<"Failed socket create to get IP"<<endl;
         exit(EXIT_FAILURE);
-    }   
-    if(connect(descr, (struct sockaddr *)&dummy, sizeof(dummy)) != 0){ 
+    }
+    if(connect(descr, (struct sockaddr *)&dummy, sizeof(dummy)) != 0){
         cout<<"Could not connect."<<endl;
         exit(EXIT_FAILURE);
-    }   
+    }
 
-    if(getsockname(descr, (struct sockaddr *)&myAddr, &addr_len) != 0){ 
+    if(getsockname(descr, (struct sockaddr *)&myAddr, &addr_len) != 0){
         cout<<"\nCould not get the IP address!\n"<<endl;
         exit(EXIT_FAILURE);
-    }   
+    }
 
     inet_ntop(AF_INET, &(myAddr.sin_addr.s_addr), addr, INET_ADDRSTRLEN);
     string test = string(addr);
@@ -386,19 +393,34 @@ void packetSendRecv(char sendOrRecv, string ipToScan, ScanType scan)
 
         cout<<"Scanning IP "<<ipToScan<<"..."<<endl;
         pcap_t *handle = setupCapture(stSockAddr.sin_port, ipToScan);
+        int retries = RETRIES;
         while(1){
             if(sendto(socketFD, buffer, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *) &stSockAddr, sizeof(stSockAddr)) < 0){
                 cout<<"\n\n\nError sending packet data\n";
                 cout<<errno<<endl<<strerror(errno);
                 exit(EXIT_FAILURE);
             } else {
-                if(pcap_loop(handle, 1, my_callback, NULL) < 0){
-                    cout<<"error: pcap_loop"<<endl;
-                    exit(1);
-                } else {
+            	int dispatch_msg = pcap_dispatch(handle, 1, my_callback, NULL);
+            	//cout<<"dispatch msg: "<<dispatch_msg<<"\n";
+                if(dispatch_msg  == -1){
+                    cout<<"errr"<<endl;
+                    return;
+                } else if(dispatch_msg > 0){
+                	cout<<"closing\n";
                     pcap_close(handle);
+                    return;
+                }else if(dispatch_msg == 0){
+                	cout<<"time out\n";
+                	if(retries > 0){
+                		cout<<"retrying.... No of retries left"<<retries<<"\n";
+                		retries--;
+                		continue;
+                	}else{
+                		cout<<"unable to get connection after all the retries allowed\n";
+                		return;
+                	}
                 }
-            }       
+            }
         }
     }
 }
@@ -410,13 +432,13 @@ int main(int argc, char* argv[]){
     }
     char sendOrRecv = *argv[1];
 
-    //    string ipToScan = "129.79.247.5";
-    string ipToScan = "129.79.247.87";
+        string ipToScan = "129.79.247.5";
+    //string ipToScan = "129.79.247.87";
     //string ipToScan = "149.160.201.190";
     //    string ipToScan = "50.129.81.224";
     //ToDo
-    currScan = ACK;
-    packetSendRecv(sendOrRecv, ipToScan, ACK);
+    currScan = SYN;
+    packetSendRecv(sendOrRecv, ipToScan, SYN);
     return 0;
 }
 
