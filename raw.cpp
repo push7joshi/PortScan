@@ -6,6 +6,7 @@
 #include<sys/socket.h>
 #include<netinet/ip.h>
 #include<netinet/tcp.h>
+#include<netinet/ip_icmp.h>
 #include<arpa/inet.h>
 #include<netinet/if_ether.h>
 #include<netdb.h>
@@ -21,6 +22,13 @@
 #endif
 
 using namespace std;
+
+
+/*class Scan{
+  int port; //Port to be scanned
+  string ip; //IP to scan
+  bool vector scanType; //holds the scans to be done
+  }*/
 
 int Port = 80;
 
@@ -39,17 +47,21 @@ struct ethernet_h{
     unsigned char etherType[2];
 };
 
+
 enum ScanType{
-    SYN,
+    SYN=0,
     FIN,
     NUL,
     XMAS,
     ACK,
     UDP
 };
+
+
 //**************change these to class variables**********//
 ScanType currScan;
 unsigned long seqNum;
+//**************change these to class variables**********//
 
 inline string stringUpper(char * lString){
     string uString = string (lString);
@@ -80,7 +92,6 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
 
     cout<<Port<<endl;
     struct servent * service = getservbyport(htons(Port), protoEntry->p_name);
-    cout<<stringUpper(service->s_name)<<endl;
 
     cout<<"\nIP src:\t";
     char ackIp[30];
@@ -90,22 +101,29 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
     bool isICMP, isTCP;
     if(ipHeader->ip_p == IPPROTO_TCP) isTCP = true;
     if(ipHeader->ip_p == IPPROTO_ICMP) isICMP = true;
-
-    cout<<"Port State\n";
-
+    //Display Header
+    cout<<"Scanning .."<<endl;
+    cout<<"IP Address: "<<ackIp<<"\n";
+    cout<<"Open ports:"<<endl;
+    cout<<"Port\tService Name\tResults\t\tConclusion"<<endl;
+    cout<<"---------------------------------------------------------------------"<<endl;
+    //Display Header
     if(isTCP){
         tcpHeader = (struct tcphdr*)(packet + sizeof(struct ip) + sizeof(ethernet_h));
         unsigned char flags = tcpHeader->th_flags;
         unsigned long ack = ntohl(tcpHeader->th_ack);
+        unsigned short sport = ntohs(tcpHeader->th_sport);
+        cout<<sport<<"\t"<<stringUpper(service->s_name)<<"\t\t";
+        currScan = SYN;
         if(ack == (seqNum + 1)){
             switch(currScan){
                 case SYN:
                     if ((flags & TH_SYN) && (flags & TH_ACK)){
-                        cout<<tcpHeader->th_sport<<"Open\n";
+                        cout<<"Open\n";
                     } else if(flags & TH_RST){
-                        cout<<tcpHeader->th_sport<<"Closed\n";
+                        cout<<"Closed\n";
                     } else if(flags & TH_SYN){
-                        cout<<tcpHeader->th_sport<<"Open\n";
+                        cout<<"Open\n";
                     } else {
                         cout<<"Closed"<<endl;
                     }
@@ -138,7 +156,11 @@ void my_callback(u_char *useless,const struct pcap_pkthdr* pkthdr,const u_char*
             }
         }
     } else if(isICMP){
-        struct icmp* icmpHeader = (struct icmp*)(packet + sizeof(struct ip) + sizeof(ethernet_h));
+        struct icmphdr* icmpHeader;
+        icmpHeader = (struct icmphdr*)(packet + sizeof(struct ip) + sizeof(ethernet_h));
+        cout<<"ICMP packets:\n";
+        cout<<"Type:"<<icmpHeader->type<<endl;
+        cout<<"Code:"<<icmpHeader->code<<endl;
         /************************ToDo*****************/
         //Complete this with all codes.
     }
@@ -170,16 +192,14 @@ pcap_t* setupCapture(int port, string ipToScan)
     { printf("pcap_open_live(): %s\n",errbuf); exit(1); }
 
     // Set the packet filter
-    string filter_str = "src host ";
-    filter_str.append(ipToScan);
-    filter_str.append(" and port ");
+    string filter_str = "icmp or port ";
     char portToScan[5];
     sprintf(portToScan, "%d", Port);
     filter_str.append(portToScan);
+    filter_str.append(" and src host ");
+    filter_str.append(ipToScan);
     cout<<"The filter expn is :"<<filter_str<<endl;
-    char fltr_str[1000];
-    sprintf(fltr_str, filter_str.c_str());
-    if(pcap_compile(handle, &filter, fltr_str, 0, netp) == -1){
+    if(pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1){
         printf("\nError compiling.. quitting");
         exit(2);
     } else {
@@ -194,20 +214,6 @@ pcap_t* setupCapture(int port, string ipToScan)
     }
     return handle;
 }
-//const u_char* packet = pcap_next(handle, &hdr);
-/*const u_char** data;
-  pcap_pkthdr *pk_hdr = &hdr;
-  int retValue = pcap_next_ex(handle, &pk_hdr , data);
-
-  if(retValue < 0)
-  exit(EXIT_FAILURE);*/
-
-/*if(packet == NULL){
-  cout<<string(pcap_geterr(handle))<<endl;
-  pcap_perror(handle, "This is the err");
-  cout<<"none"<<endl;
-  exit(EXIT_FAILURE);
-  }*/
 
 unsigned short in_cksum(unsigned short *addr, int len)
 
@@ -320,7 +326,7 @@ void createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan,
     tcpHeader->th_sport     = htons(44748);
     tcpHeader->th_dport     = stSockAddr.sin_port;
     seqNum                  = random();
-    tcpHeader->th_seq       = seqNum;
+    tcpHeader->th_seq       = htonl(seqNum); //seqNum;
     tcpHeader->th_x2        = 0;
     tcpHeader->th_ack       = 0;
     tcpHeader->th_off       = sizeof(struct tcphdr)/4; //20 bytes
@@ -392,13 +398,16 @@ void packetSendRecv(char sendOrRecv, string ipToScan, ScanType scan)
                 cout<<errno<<endl<<strerror(errno);
                 exit(EXIT_FAILURE);
             } else {
-                if(pcap_loop(handle, 1, my_callback, NULL) < 0){
-                    cout<<"error: pcap_loop"<<endl;
-                    exit(1);
-                } else {
-                    pcap_close(handle);
+                pcap_pkthdr* pkt_header;
+                const u_char* packet = pcap_next(handle, pkt_header);
+                if(packet != NULL){
+                    my_callback(NULL, pkt_header, packet);
                 }
-            }       
+                else{
+                    cout<<"NULL Packet"<<endl;
+                    break;
+                }
+            }
         }
     }
 }
@@ -412,11 +421,10 @@ int main(int argc, char* argv[]){
 
     //    string ipToScan = "129.79.247.5";
     string ipToScan = "129.79.247.87";
-    //string ipToScan = "149.160.201.190";
+    //    string ipToScan = "149.160.201.212";
     //    string ipToScan = "50.129.81.224";
     //ToDo
-    currScan = ACK;
-    packetSendRecv(sendOrRecv, ipToScan, ACK);
+    packetSendRecv(sendOrRecv, ipToScan, SYN);
     return 0;
 }
 
