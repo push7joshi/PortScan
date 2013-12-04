@@ -16,7 +16,10 @@
 #include<ifaddrs.h>
 #include<net/if.h>
 #include<algorithm>
-
+#ifndef RAW_H
+#define RAW_H
+#include "raw.h"
+#endif
 #ifndef   NI_MAXHOST
 #define   NI_MAXHOST 1025
 #endif
@@ -24,56 +27,40 @@
 #define RETRIES 3
 using namespace std;
 
-
 /*class Scan{
-  int port; //Port to be scanned
-  string ip; //IP to scan
-  bool vector scanType; //holds the scans to be done
-  }*/
-
-int Port = 80;
+ int port; //Port to be scanned
+ string ip; //IP to scan
+ bool vector scanType; //holds the scans to be done
+ }*/
 
 struct psd_tcp {
-    struct in_addr src;
-    struct in_addr dst;
-    unsigned char pad;
-    unsigned char proto;
-    unsigned short tcp_len;
-    struct tcphdr tcp;
+	struct in_addr src;
+	struct in_addr dst;
+	unsigned char pad;
+	unsigned char proto;
+	unsigned short tcp_len;
+	struct tcphdr tcp;
 };
 
-struct ethernet_h{
-    unsigned char destMac[6];
-    unsigned char srcMac[6];
-    unsigned char etherType[2];
+struct ethernet_h {
+	unsigned char destMac[6];
+	unsigned char srcMac[6];
+	unsigned char etherType[2];
 };
-
-
-enum ScanType{
-    SYN=0,
-    FIN,
-    NUL,
-    XMAS,
-    ACK,
-    UDP
-};
-
 
 //**************change these to class variables**********//
-ScanType currScan;
 unsigned long seqNum;
 //**************change these to class variables**********//
 
-inline string stringUpper(char * lString){
-    string uString = string (lString);
-    transform(uString.begin(), uString.end(), uString.begin(), :: toupper);
-    return uString;
+string stringUpper(char * lString) {
+	string uString = string(lString);
+	transform(uString.begin(), uString.end(), uString.begin(), ::toupper);
+	return uString;
 }
-
 
 /* callback function that is passed to pcap_loop(..) and called each time
  * a packet is recieved                                                    */
-void my_callback(struct pcap_pkthdr pkthdr,const u_char* packet)
+void my_callback(struct pcap_pkthdr pkthdr,const u_char* packet, ScanType currScan, short Port)
 {
     struct ip* ipHeader;
     struct tcphdr* tcpHeader;
@@ -95,8 +82,6 @@ void my_callback(struct pcap_pkthdr pkthdr,const u_char* packet)
         serviceName = stringUpper(service->s_name);
     else
         serviceName = "Not found.";
-
-
 
     cout<<"\nIP src:\t";
     char ackIp[30];
@@ -199,149 +184,148 @@ void my_callback(struct pcap_pkthdr pkthdr,const u_char* packet)
     }
 }
 
+pcap_t* setupCapture(short port, string ipToScan) {
+	int i;
+	char *dev;
+	char errbuf[PCAP_ERRBUF_SIZE];
+	pcap_t* handle;
+	struct pcap_pkthdr hdr; // pcap.h
+	struct ether_header *eptr; // net/ethernet.h
+	struct bpf_program filter;
+	bpf_u_int32 maskp; // subnet mask
+	bpf_u_int32 netp;
 
-pcap_t* setupCapture(int port, string ipToScan)
-{
-    int i;
-    char *dev;
-    char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t* handle;
-    struct pcap_pkthdr hdr;     // pcap.h
-    struct ether_header *eptr;  // net/ethernet.h
-    struct  bpf_program filter;
-    bpf_u_int32 maskp;          // subnet mask
-    bpf_u_int32 netp;
+	dev = pcap_lookupdev(errbuf); //get the device to capture packets
+	if (dev == NULL) {
+		printf("%s\n", errbuf);
+		exit(1);
+	}
 
-    dev = pcap_lookupdev(errbuf); //get the device to capture packets
-    if(dev == NULL)
-    { printf("%s\n",errbuf); exit(1); }
+	cout << dev << endl;
 
-    cout<<dev<<endl;
+	pcap_lookupnet(dev, &netp, &maskp, errbuf); //get the net address and mask
 
-    pcap_lookupnet(dev,&netp,&maskp,errbuf); //get the net address and mask
+	handle = pcap_open_live(dev, BUFSIZ, 0, 100, errbuf); //open the device for capture
+	if (handle == NULL) {
+		printf("pcap_open_live(): %s\n", errbuf);
+		exit(1);
+	}
 
-    handle = pcap_open_live(dev, BUFSIZ, 0, 100, errbuf); //open the device for capture
-    if(handle == NULL)
-    { printf("pcap_open_live(): %s\n",errbuf); exit(1); }
+	// Set the packet filter
 
-    // Set the packet filter
+	string filter_str = "icmp or port ";
+	char portToScan[5];
+	sprintf(portToScan, "%d", ntohs(port));
+	filter_str.append(portToScan);
+	filter_str.append(" and src host ");
+	filter_str.append(ipToScan);
+	cout << "The filter expn is :" << filter_str << endl;
+	if (pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1) {
+		printf("\nError compiling.. quitting");
+		exit(2);
+	} else {
+		cout << "compiled\n" << endl;
+	}
 
-    string filter_str = "icmp or port ";
-    char portToScan[5];
-    sprintf(portToScan, "%d", Port);
-    filter_str.append(portToScan);
-    filter_str.append(" and src host ");
-    filter_str.append(ipToScan);
-    cout<<"The filter expn is :"<<filter_str<<endl;
-    if(pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1){
-        printf("\nError compiling.. quitting");
-        exit(2);
-    } else {
-        cout<<"compiled\n"<<endl;
-    }
-
-    if(pcap_setfilter(handle, &filter) == -1){
-        printf("\nFilter err. Quit");
-        exit(2);
-    } else {
-        cout<<"filtered\n"<<endl;
-    }
-    return handle;
+	if (pcap_setfilter(handle, &filter) == -1) {
+		printf("\nFilter err. Quit");
+		exit(2);
+	} else {
+		cout << "filtered\n" << endl;
+	}
+	return handle;
 }
-
 
 //printf("Jacked a packet with length of [%d]\n", hdr.len);
 //
 
-
 unsigned short in_cksum(unsigned short *addr, int len)
 
 {
-    int nleft = len;
-    int sum = 0;
-    unsigned short *w = addr;
-    unsigned short answer = 0;
+	int nleft = len;
+	int sum = 0;
+	unsigned short *w = addr;
+	unsigned short answer = 0;
 
-    while (nleft > 1) {
-        sum += *w++;
-        nleft -= 2;
-    }
+	while (nleft > 1) {
+		sum += *w++;
+		nleft -= 2;
+	}
 
-    if (nleft == 1) {
-        *(unsigned char *) (&answer) = *(unsigned char *) w;
-        sum += answer;
-    }
+	if (nleft == 1) {
+		*(unsigned char *) (&answer) = *(unsigned char *) w;
+		sum += answer;
+	}
 
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    answer = ~sum;
-    return (answer);
+	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum += (sum >> 16);
+	answer = ~sum;
+	return (answer);
 }
 
-unsigned short in_cksum_tcp(int src, int dst, unsigned short *addr, int len)
-{
-    struct psd_tcp buf;
-    u_short ans;
+unsigned short in_cksum_tcp(int src, int dst, unsigned short *addr, int len) {
+	struct psd_tcp buf;
+	u_short ans;
 
-    memset(&buf, 0, sizeof(buf));
-    buf.src.s_addr = src;
-    buf.dst.s_addr = dst;
-    buf.pad = 0;
-    buf.proto = IPPROTO_TCP;
-    buf.tcp_len = htons(len);
-    memcpy(&(buf.tcp), addr, len);
-    ans = in_cksum((unsigned short *)&buf, 12 + len);
-    return (ans);
+	memset(&buf, 0, sizeof(buf));
+	buf.src.s_addr = src;
+	buf.dst.s_addr = dst;
+	buf.pad = 0;
+	buf.proto = IPPROTO_TCP;
+	buf.tcp_len = htons(len);
+	memcpy(&(buf.tcp), addr, len);
+	ans = in_cksum((unsigned short *) &buf, 12 + len);
+	return (ans);
 }
 
-unsigned short csum(unsigned short *buf, int nwords)
-{
-    unsigned long sum;
-    for(sum=0; nwords>0; nwords--)
-        sum += *buf++;
-    sum = (sum >> 16) + (sum &0xffff);
-    sum += (sum >> 16);
-    return (unsigned short)(~sum);
+unsigned short csum(unsigned short *buf, int nwords) {
+	unsigned long sum;
+	for (sum = 0; nwords > 0; nwords--)
+		sum += *buf++;
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+	return (unsigned short) (~sum);
 }
 
-struct in_addr getMyAddress(){
-    struct ifaddrs *ifap, *ifa;
-    struct sockaddr_in *sa;
-    char addr[NI_MAXHOST];
-    int i = getifaddrs(&ifap);
-    getifaddrs (&ifap);
+struct in_addr getMyAddress() {
+	struct ifaddrs *ifap, *ifa;
+	struct sockaddr_in *sa;
+	char addr[NI_MAXHOST];
+	int i = getifaddrs(&ifap);
+	getifaddrs(&ifap);
 
-    struct sockaddr_in dummy, myAddr;
-    socklen_t addr_len = sizeof(myAddr);
-    dummy.sin_addr.s_addr = inet_addr("74.125.225.209");
-    dummy.sin_family = AF_INET;
-    dummy.sin_port = htons(80);
+	struct sockaddr_in dummy, myAddr;
+	socklen_t addr_len = sizeof(myAddr);
+	dummy.sin_addr.s_addr = inet_addr("74.125.225.209");
+	dummy.sin_family = AF_INET;
+	dummy.sin_port = htons(80);
 
-    int descr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(descr < 0){
-        cout<<"Failed socket create to get IP"<<endl;
-        exit(EXIT_FAILURE);
-    }
-    if(connect(descr, (struct sockaddr *)&dummy, sizeof(dummy)) != 0){
-        cout<<"Could not connect."<<endl;
-        exit(EXIT_FAILURE);
-    }
+	int descr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (descr < 0) {
+		cout << "Failed socket create to get IP" << endl;
+		exit(EXIT_FAILURE);
+	}
+	if (connect(descr, (struct sockaddr *) &dummy, sizeof(dummy)) != 0) {
+		cout << "Could not connect." << endl;
+		exit(EXIT_FAILURE);
+	}
 
-    if(getsockname(descr, (struct sockaddr *)&myAddr, &addr_len) != 0){
-        cout<<"\nCould not get the IP address!\n"<<endl;
-        exit(EXIT_FAILURE);
-    }
+	if (getsockname(descr, (struct sockaddr *) &myAddr, &addr_len) != 0) {
+		cout << "\nCould not get the IP address!\n" << endl;
+		exit(EXIT_FAILURE);
+	}
 
-    inet_ntop(AF_INET, &(myAddr.sin_addr.s_addr), addr, INET_ADDRSTRLEN);
-    string test = string(addr);
-    cout<<test<<endl;
+	inet_ntop(AF_INET, &(myAddr.sin_addr.s_addr), addr, INET_ADDRSTRLEN);
+	string test = string(addr);
+	cout << test << endl;
 
-    for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-        if(((struct sockaddr_in*)ifa->ifa_addr)->sin_addr.s_addr == myAddr.sin_addr.s_addr){
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (((struct sockaddr_in*) ifa->ifa_addr)->sin_addr.s_addr
+				== myAddr.sin_addr.s_addr) {
 
-            return myAddr.sin_addr;
-        }
-    }
+			return myAddr.sin_addr;
+		}
+	}
 }
 
 void createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan, sockaddr_in &stSockAddr)
@@ -374,7 +358,6 @@ void createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan,
     tcpHeader->th_sum       = 0;
 
     //set the tcp flag as per the scan type
-    currScan = scan;
     switch (scan){
         case SYN:
             tcpHeader->th_flags = TH_SYN;
@@ -397,7 +380,7 @@ void createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan,
     tcpHeader->th_sum = in_cksum_tcp(ipHeader->ip_src.s_addr, ipHeader->ip_dst.s_addr, (unsigned short *)tcpHeader, sizeof(struct tcphdr));
 }
 
-void packetSendRecv(string ipToScan, ScanType scan)
+void packetSendRecv(string ipToScan, short Port, ScanType scan)
 {
     int socketFD = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
     if(socketFD < 0){
@@ -439,7 +422,7 @@ void packetSendRecv(string ipToScan, ScanType scan)
             pcap_pkthdr pkt_header;
             const u_char* packet = pcap_next(handle, &pkt_header);
             if(packet != NULL){
-                my_callback(pkt_header, packet);
+                my_callback(pkt_header, packet, scan, Port);
                 break;
             }
             else{
@@ -471,15 +454,20 @@ void packetSendRecv(string ipToScan, ScanType scan)
         }
     }
 }
+/*
+ int main(int argc, char* argv[]){
+ if(argc != 2){
+ cout<<"Usage:"<<endl<<"raw [s/r] [ip]";
+ exit(EXIT_FAILURE);
+ }
+ char sendOrRecv = *argv[1];
 
-int main(int argc, char* argv[]){
-    string ipToScan = "129.79.247.5";
-    //    string ipToScan = "129.79.247.87";
-//    string ipToScan = "149.160.200.88";
-    //    string ipToScan = "50.129.81.224";
-    //ToDo
-    packetSendRecv(ipToScan, SYN);
-    return 0;
-}
-
-
+ //    string ipToScan = "129.79.247.5";
+ string ipToScan = "129.79.247.87";
+ //    string ipToScan = "149.160.201.212";
+ //    string ipToScan = "50.129.81.224";
+ //ToDo
+ packetSendRecv(sendOrRecv, ipToScan, SYN);
+ return 0;
+ }
+ */
