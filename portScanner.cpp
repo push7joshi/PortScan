@@ -7,21 +7,22 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fstream>
+#include "raw.h"
 
 using namespace std;
 
 #define TCP_SYN 0
 #define TCP_NULL 1
-#define FIN 2
-#define XMAS 3
+#define TCP_FIN 2
+#define TCP_XMAS 3
 #define TCP_ACK 4
-#define UDP 5
+#define UDP_SCAN 5
 
 struct ps_args_t {
 	vector<int> ports;
 	vector<string> ip;
 	int num_threads;
-	vector<string> scans;
+	bool scans[6];
 	string prefix;
 	vector<int>::iterator port_iterator;
 	vector<string>::iterator ip_iterator;
@@ -47,7 +48,7 @@ void get_ports(vector<int> &ports, char* string) {
 		if (position == 0) {
 			break;
 		} else {
-			cout << "next" << *next << "\n";
+			//cout << "next" << *next << "\n";
 			if (*next == '-') {
 				prev = position;
 			} else {
@@ -89,8 +90,8 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 	ps_args.ip = vector<string>();
 	ps_args.num_threads = 1;
 	ps_args.prefix = string();
-	//(ps_args.scans, 0, sizeof(ps_args.scans));
-	ps_args.scans = vector<string>();
+	memset(ps_args.scans, 0, sizeof(ps_args.scans));
+	//ps_args.scans = vector<string>();
 	/*
 	 --help <display invocation options>. Example: ”./portScanner --help”.
 	 --ports <ports to scan>. Example: ”./portScanner --ports 1,2,3-5”.
@@ -146,12 +147,12 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 		case 'p': //help
 			//usage(stdout);
 
-			cout << "included ports\n";
+			//cout << "included ports\n";
 			get_ports(ps_args.ports, optarg);
-			for (vector<int>::iterator it = ps_args.ports.begin();
+			/*for (vector<int>::iterator it = ps_args.ports.begin();
 					it != ps_args.ports.end(); ++it) {
-				cout << " " << *it << " \n";
-			}
+			cout << " " << *it << " \n";
+			}*/
 			break;
 		case 't': //help
 				  //usage(stdout);
@@ -161,9 +162,9 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			break;
 		case 's': //help
 			//usage(stdout);
-			cout << "dadafsd\n";
-			/*scans_flag = 1;
-			 char UDP_C[] = "UDP\0";
+			//cout << "dadafsd\n";
+			scans_flag = 1;
+			/*			char UDP_C[] = "UDP\0";
 			 char FIN_C[] = "FIN_C\0";
 			 char TCP_SYN_C[] = "SYN\0";
 			 char XMAS_C[] = "XMAS\0";
@@ -172,20 +173,21 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			 */
 			curr = optind - 1;
 			for (; curr < argc && argv[curr] != "-"; curr++) {
-				ps_args.scans.push_back(optarg);
-				/*	if (strcmp(optarg, UDP_C) == 0) {
-				 ps_args.scans[UDP] = 1;
-				 } else if (strcmp(optarg, FIN_C) == 0) {
-				 ps_args.scans[FIN] = 1;
-				 } else if (strcmp(optarg, TCP_SYN_C) == 0) {
-				 ps_args.scans[TCP_SYN] = 1;
-				 } else if (strcmp(optarg, XMAS_C) == 0) {
-				 ps_args.scans[XMAS] = 1;
-				 } else if (strcmp(optarg, TCP_ACK_C) == 0) {
-				 ps_args.scans[TCP_ACK] = 1;
-				 } else if (strcmp(optarg, TCP_NULL_C) == 0) {
-				 ps_args.scans[TCP_NULL] = 1;
-				 }*/
+				scans_flag = 0;
+				opt = optarg;
+				if (opt == "UDP") {
+					ps_args.scans[UDP] = 1;
+				} else if (optarg == "FIN") {
+					ps_args.scans[FIN] = 1;
+				} else if (opt == "SYN") {
+					ps_args.scans[TCP_SYN] = 1;
+				} else if (opt == "XMAS") {
+					ps_args.scans[XMAS] = 1;
+				} else if (opt == "ACK") {
+					ps_args.scans[TCP_ACK] = 1;
+				} else if (opt == "NULL") {
+					ps_args.scans[TCP_NULL] = 1;
+				}
 			}
 			break;
 		default:
@@ -211,7 +213,7 @@ void get_next_ip_port(ps_args_t &ps_args, string &ip, int &port) {
 				return;
 			}
 		} else {
-			cout << "asdasdasd\n";
+			//cout << "asdasdasd\n";
 			ip = *(ps_args.ip_iterator);
 			port = *(ps_args.port_iterator);
 			ps_args.port_iterator++;
@@ -227,10 +229,35 @@ void perform_scan(ps_args_t &ps_args) {
 	int port = 0;
 	while (ip != "finish" && port != -1) {
 		get_next_ip_port(ps_args, ip, port);
-		for (vector<string>::iterator s = ps_args.scans.begin();
-				s != ps_args.scans.end(); ++s) {
+		if (ip == "finish" && port == -1){
+			break;
+		}
+		for (int s = 0; s < 6; s++) {
+			if (ps_args.scans[s] == 1) {
+				cout << ip << "\t" << port << "\t" << ps_args.scans[s];
+				ScanType j;
+				switch (s) {
+				case SYN:
+					packetSendRecv('s',ip,port,SYN);
+					break;
+				case NUL:
+					packetSendRecv('s',ip,port,NUL);
+					break;
+				case FIN:
+					packetSendRecv('s',ip,port,FIN);
+					break;
+				case XMAS:
+					packetSendRecv('s',ip,port,XMAS);
+					break;
+				case ACK:
+					packetSendRecv('s',ip,port,ACK);
+					break;
+				case UDP:
+					packetSendRecvUDP('s',ip,port);
+					break;
+				}
 
-			cout << ip << "\t" << port << "\t" << *s;
+			}
 		}
 	}
 }
@@ -247,8 +274,8 @@ int main(int argc, char * argv[]) {
 	///cout<<"dasdasdafs"<<*(k)<<"\n";
 	//cout << "kgmblkdfmgod\n";
 //	/cout<<"skkdmasd"<<*(ps_args.ip.begin()+1)<<"\n";
-	cout << "first" << *(ps_args.ip_iterator) << "\t\n";
-	cout << *(ps_args.port_iterator) << "\n";
+	//cout << "first" << *(ps_args.ip_iterator) << "\t\n";
+	//cout << *(ps_args.port_iterator) << "\n";
 	perform_scan(ps_args);
 	/*for (vector<string>::iterator i = ps_args.ip.begin(); i != ps_args.ip.end();
 	 ++i) {

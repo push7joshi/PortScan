@@ -1,2 +1,2 @@
 all:
-	g++ raw.cpp -o raw.o -lpcap
+	g++ raw_udp.cpp raw.cpp portScanner.cpp -o portScanner -lpcap
