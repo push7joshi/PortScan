@@ -108,11 +108,14 @@ void my_callbackUDP(u_char *useless, const struct pcap_pkthdr* pkthdr,
         // encloses first 8 bytes of transport header
         unsigned int type = (unsigned int) icmpHeader->icmp_type;
         unsigned int code = (unsigned int) icmpHeader->icmp_code;
-        //cout<<type<<"-=-=-=-=-=-=-=\t"<<code;
+        cout<<type<<"-=-=-=-=-=-=-=\t"<<code; //1, 2, 9, 10, or 13
+
         if (type == 3
-                && (code == 1 || code == 2 || code == 3 || code == 9
+                && (code == 1 || code == 2 ||  code == 9
                     || code == 10 || code == 13)) {
             cout << "Filtered\n";
+        }else if(type == 3 && code == 3){
+        	cout<<"Closed\n";
         }
     }
 
