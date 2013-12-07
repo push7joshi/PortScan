@@ -45,13 +45,12 @@ struct ethernet_h {
 typedef struct scanSpec{
     ScanType scan;
     short port;
-    int seqNum;
 }scanObj;
 
 //**************change these to class variables**********//
 int timeout = 3000;
 int retries = 3;
-int seqNum;
+int seqNum=0;
 //**************change these to class variables**********//
 
 
@@ -334,7 +333,7 @@ struct in_addr getMyAddress() {
 }
 
 //Scan
-int createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan, sockaddr_in &stSockAddr)
+void createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan, sockaddr_in &stSockAddr)
 {
     cout<<"1."<<packet<<endl;
     struct ip *ipHeader   = (struct ip*)packet;
@@ -354,7 +353,7 @@ int createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan, 
     ipHeader->ip_dst.s_addr = stSockAddr.sin_addr.s_addr;
     tcpHeader->th_sport     = htons(44748);
     tcpHeader->th_dport     = stSockAddr.sin_port;
-    int seqNum              = random();
+    seqNum              = random();
     tcpHeader->th_seq       = htonl(seqNum); //seqNum;
     tcpHeader->th_x2        = 0;
     tcpHeader->th_ack       = 0;
@@ -384,7 +383,6 @@ int createTcpPacket(char* packet, int protocol, string ipToScan, ScanType scan, 
 
     ipHeader->ip_sum = csum((unsigned short *)packet, ipHeader->ip_len >> 1);
     tcpHeader->th_sum = in_cksum_tcp(ipHeader->ip_src.s_addr, ipHeader->ip_dst.s_addr, (unsigned short *)tcpHeader, sizeof(struct tcphdr));
-    return seqNum;
 }
 
 //helper
@@ -432,7 +430,7 @@ void packetSendRecv(string ipToScan, short port, ScanType scan)
     char buffer[4096]; /* single packets are usually not bigger than 8192 bytes */
     memset(buffer, 0, 4096);
 
-    int seqNum = createTcpPacket(buffer, IPPROTO_TCP, ipToScan, scan, stSockAddr);
+    createTcpPacket(buffer, IPPROTO_TCP, ipToScan, scan, stSockAddr);
 
     //calling iphdrincl
     int one = 1;
