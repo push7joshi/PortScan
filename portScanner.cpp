@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fstream>
+#include <math.h>
 #ifndef RAW_H
 #define RAW_H
 #include "raw.h"
@@ -88,6 +89,61 @@ void read_ip_from_file(vector<string> &ip_list, char* file_name) {
 	}
 }
 
+void parse_prefixes(ps_args_t &ps_args) {
+	string prefix = ps_args.prefix;
+	ps_args.ip = vector<string>();
+//	/long mask;
+	//long ip_num = 0;
+	char delim = '/';
+	char * ip_char = strtok((char *) prefix.c_str(), &delim);
+	char * delim_char = strtok(NULL, &delim);
+	int ip_int = 0;
+	char temp[INET_ADDRSTRLEN];
+
+	unsigned int host_len = strtol(delim_char, NULL, 10);
+	//printf("0-0-0-0-0----%x\n", host_len);
+	unsigned int range = (unsigned int) pow(2, host_len);
+	unsigned int subnet_mask = (unsigned int) pow(2, 32) - range + 1; //	unsigned int range = (unsigned int) pow(2, range);(int) pow(2, host_len);
+	//cout << "hostlen,----subnet mask" << host_len << "-=======" << subnet_mask << "\n";
+
+	inet_pton(AF_INET, ip_char, &ip_int);
+	//cout<<"b------->"<<ip_int<<"\n";
+	ip_int = ntohl(ip_int);
+
+	unsigned int ip_after_mask = ip_int & subnet_mask;
+
+	for (int i = 0; i < range; i++) {
+		//cout<<"b------->"<<ip_int<<"\n";
+		ip_after_mask += 1;
+		//cout<<"b------->"<<ip_int<<"\n";
+		int ip_to_be_converted = htonl(ip_after_mask);
+		//cout<<"b------->"<<ip_int<<"\n";
+		inet_ntop(AF_INET, &ip_to_be_converted, temp, INET_ADDRSTRLEN);
+		string s = temp;
+		ps_args.ip.push_back(s);
+		//cout << "a-=-=-=-=-=-===-=>" << s << "\n";
+
+	}
+
+	cout << ip_char << "|||||" << delim_char << "\n";
+	//cout<<"|_+_+_+_+_+|"<<"\n";
+	return;
+	/*	char * next;
+	 char *curr = (char *) prefix.c_str();
+	 ip_num = strtol(curr, &next, 10)*(pow(2,24));
+	 curr = next+1;
+
+	 ip_num += strtol(curr, &next, 10)*(pow(2,16));
+	 curr = next+1;
+	 ip_num += strtol(curr, &next, 10)*(pow(2,8));
+	 curr = next+1;
+	 ip_num += strtol(curr, &next, 10);
+	 curr = next+1;
+	 ip_char[4] = strtol(curr, &next, 10);
+	 //curr = next;
+	 //printf("prefix: %d|%d|%d|%d|%d\n", ip_char[0],ip_char[1],ip_char[2],ip_char[3],ip_char[4],ip_char[5]);
+	 */
+}
 void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 	ps_args.ports = vector<int>(1, -1);
 	ps_args.ip = vector<string>();
@@ -144,6 +200,8 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 		case 'r': //help
 			//usage(stdout);
 			ps_args.prefix = optarg;
+			parse_prefixes(ps_args);
+
 			//cout << "prfix " << ps_args.prefix << "\n";
 			//exit(0);
 			break;
@@ -153,9 +211,9 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			//cout << "included ports\n";
 			get_ports(ps_args.ports, optarg);
 			/*for (vector<int>::iterator it = ps_args.ports.begin();
-					it != ps_args.ports.end(); ++it) {
-			cout << " " << *it << " \n";
-			}*/
+			 it != ps_args.ports.end(); ++it) {
+			 cout << " " << *it << " \n";
+			 }*/
 			break;
 		case 't': //help
 				  //usage(stdout);
@@ -232,7 +290,7 @@ void perform_scan(ps_args_t &ps_args) {
 	int port = 0;
 	while (ip != "finish" && port != -1) {
 		get_next_ip_port(ps_args, ip, port);
-		if (ip == "finish" && port == -1){
+		if (ip == "finish" && port == -1) {
 			break;
 		}
 		for (int s = 0; s < 6; s++) {
@@ -241,22 +299,22 @@ void perform_scan(ps_args_t &ps_args) {
 				ScanType j;
 				switch (s) {
 				case SYN:
-					packetSendRecv(ip,port,SYN);
+					packetSendRecv(ip, port, SYN);
 					break;
 				case NUL:
-					packetSendRecv(ip,port,NUL);
+					packetSendRecv(ip, port, NUL);
 					break;
 				case FIN:
-					packetSendRecv(ip,port,FIN);
+					packetSendRecv(ip, port, FIN);
 					break;
 				case XMAS:
-					packetSendRecv(ip,port,XMAS);
+					packetSendRecv(ip, port, XMAS);
 					break;
 				case ACK:
-					packetSendRecv(ip,port,ACK);
+					packetSendRecv(ip, port, ACK);
 					break;
 				case UDP:
-					packetSendRecvUDP(ip,port);
+					packetSendRecvUDP(ip, port);
 					break;
 				}
 
