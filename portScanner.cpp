@@ -323,7 +323,6 @@ void perform_scan(ps_args_t &ps_args) {
 	}
 }
 int main(int argc, char * argv[]) {
-	cout << "a;jfnsdlkffjsdofkjasoibhgasduiofgasiugfjaofidfufd\n";
 	ps_args_t ps_args;
 	parse_args(ps_args, argc, argv);
 	ps_args.ip_iterator = ps_args.ip.begin();
