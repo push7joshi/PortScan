@@ -44,9 +44,6 @@ typedef struct scanSpec{
     short port;
 }scanObj;
 
-int timeout = 3000;
-int retries = 3;
-
 class Scan{
     public:
         void ScanJob(string ip, unsigned short Port, vector<ScanType> stScan){

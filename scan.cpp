@@ -1,5 +1,7 @@
 #include "scan.h"
 
+int timeout = 3000;
+int retries = 3;
 
 /* callback function that is passed to pcap_loop(..) and called each time
  * a packet is recieved                                                    */
