@@ -20,6 +20,7 @@
 #include<net/if.h>
 #include<algorithm>
 #include<vector>
+#include<map>
 #include "helpers.h"
 #include "service.h"
 
@@ -34,30 +35,41 @@ enum ScanType{
     UDP=5
 };
 
+enum PortState{
+    Open = 0,
+    Closed,
+    Filtered,
+    Unfiltered,
+    ClosedAndUnfiltered,
+    CloedAndFiltered,
+    OpenAndUnfiltered,
+    OpenAndFiltered,
+    OpenORFiltered,
+    NoResposne,
+    Unknown,
+    NotUsed
+};
+
 struct ethernet_h {
     unsigned char destMac[6];
     unsigned char srcMac[6];
     unsigned char etherType[2];
 };
 
-typedef struct scanSpec{
-    ScanType scan;
-    short port;
-}scanObj;
-
 static vector<int> knownService{ 22,24,25,43,80,110,143,587};
 
 class Scan{
     public:
-        void ScanJob(string ip, unsigned short Port, vector<ScanType> stScan){
-            ipToScan = ip;
-            port = Port;
-            scanVector = stScan;
+        Scan(){
+            PortState initState = Unknown;
+            for(int i=0; i<6;i++){
+                scanResult[(ScanType)i] = initState;
+            }
         }
 
         string ipToScan;
         unsigned short port;
-        vector<ScanType> scanVector;
+        map<ScanType, PortState> scanResult;
         int seqNum;
         pcap_t* capDesc;
         ScanType cScan;

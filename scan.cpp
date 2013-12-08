@@ -22,6 +22,7 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
 
     Scan *mySelf = (Scan *)scanObj;
     string serviceName;
+    ScanType currentScan = mySelf->cScan;
 
     if(find(knownService.begin(), knownService.end(), ntohs(mySelf->port)) != knownService.end()){
         serviceName = servChk(mySelf->ipToScan, ntohs(mySelf->port));
@@ -32,66 +33,64 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
         else
             serviceName = "Not found.";
     }
-    cout<<"\nIP src:\t";
-    char ackIp[30];
-    string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
-    cout<<ipToScan<<endl;
-    cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ipHeader->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
 
     bool isICMP, isTCP;
     if(ipHeader->ip_p == IPPROTO_TCP) isTCP = true;
     if(ipHeader->ip_p == IPPROTO_ICMP) isICMP = true;
+    /*Display ToDo
+       cout<<"\nIP src:\t";
+       char ackIp[30];
+       string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
+       cout<<ipToScan<<endl;
+       cout<<"\nIP Dest:"<<string(inet_ntop(AF_INET, &(ipHeader->ip_dst), ackIp, INET_ADDRSTRLEN))<<"\n";
+
     //Display Header
     cout<<"Scanning .."<<endl;
-    cout<<"Current Scan: "<<mySelf->cScan<<endl;
+    cout<<"Current Scan: "<<currentScan<<endl;
     cout<<"IP Address: "<<ackIp<<"\n";
     cout<<"Open ports:"<<endl;
     cout<<"Port\tService Name\tResults\t\tConclusion"<<endl;
     cout<<"---------------------------------------------------------------------"<<endl;
-    //Display Header
+    //Display Header*/
     if(isTCP){
         tcpHeader = (struct tcphdr*)(packet + sizeof(struct ip) + sizeof(ethernet_h));
         unsigned char flags = tcpHeader->th_flags;
         unsigned long ack = ntohl(tcpHeader->th_ack);
         unsigned short sport = ntohs(tcpHeader->th_sport);
-        cout<<sport<<"\t"<<serviceName<<"\t";
+     //   cout<<sport<<"\t"<<serviceName<<"\t";
         if(ack == (mySelf->seqNum + 1)){
-            switch(mySelf->cScan){
+            switch(currentScan){
                 case SYN:
-                    if ((flags & TH_SYN) && (flags & TH_ACK)){
-                        cout<<"Open\n";
-                    } else if(flags & TH_RST){
-                        cout<<"Closed\n";
-                    } else if(flags & TH_SYN){
-                        cout<<"Open\n";
+                    if(((flags & TH_SYN) && (flags & TH_ACK))
+                            || (flags & TH_SYN)){
+                        mySelf->scanResult[currentScan] = Open;
                     } else {
-                        cout<<"Closed"<<endl;
+                        mySelf->scanResult[currentScan] = Closed;
                     }
-                    cout<<endl;
                     break;
                 case ACK:
                     if(flags & TH_RST){
-                        cout<<"Unfiltered\n";
+                        mySelf->scanResult[currentScan] = Unfiltered;
                     }
                     break;
                 case NUL:
                 case FIN:
                 case XMAS:
                     if(flags & TH_RST){
-                        cout<<"Closed|Unfiltered\n";
+                        mySelf->scanResult[currentScan] = ClosedAndUnfiltered;
                     }
                     break;
             }
         } else {
-            switch(mySelf->cScan){
+            switch(currentScan){
                 case XMAS:
                 case NUL:
                 case FIN:
-                    cout<<"Open|Filtered\n";
+                    mySelf->scanResult[currentScan] = OpenORFiltered;
                     break;
                 case SYN:
                 case ACK:
-                    cout<<"Filtered\n";
+                    mySelf->scanResult[currentScan] = Filtered;
                     break;
             }
         }
@@ -111,25 +110,22 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
             unsigned short sport = ntohs(enclosedTcp->th_sport);
             cout<<sport<<"\t"<<serviceName<<"\t\t";
             if( type == 3 && (code == 1 || code == 2 || code == 3 || code == 9 || code == 10 || code == 13)){
-                cout<<"Filtered\n";
+                mySelf->scanResult[currentScan] = Filtered;
             } else {
-                switch(mySelf->cScan){
+                switch(currentScan){
                     case XMAS:
                     case NUL:
                     case FIN:
-                        cout<<"Open|Filtered\n";
+                        mySelf->scanResult[currentScan] = OpenORFiltered;
                         break;
                     case SYN:
                     case ACK:
-                        cout<<"Filtered\n";
+                        mySelf->scanResult[currentScan] = Filtered;
                         break;
 
                 }
             }
-
         }
-        /************************ToDo*****************/
-        //Complete this with all codes.
     }
 }
 
@@ -151,7 +147,7 @@ pcap_t* Scan::setupCapture(){
         exit(1);
     }
 
-    cout << dev << endl;
+//    cout << dev << endl;
 
     pcap_lookupnet(dev, &netp, &maskp, errbuf); //get the net address and mask
 
@@ -169,7 +165,7 @@ pcap_t* Scan::setupCapture(){
     filter_str.append(portToScan);
     filter_str.append(" and src host ");
     filter_str.append(ipToScan);
-    cout << "The filter expn is :" << filter_str << endl;
+//    cout << "The filter expn is :" << filter_str << endl;
     if (pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1) {
         printf("\nError compiling.. quitting");
         exit(2);
@@ -273,21 +269,22 @@ void Scan::runTcpScan()
 
     cout<<"Scanning IP "<<ipToScan<<"..."<<endl;
     //Scan
-    pcap_t *handle = setupCapture();
+//    pcap_t *handle = setupCapture();
+    capDesc = setupCapture();
     while(1){
         if(sendto(socketFD, buffer, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *) &stSockAddr, sizeof(stSockAddr)) < 0){
             cout<<"\n\n\nError sending packet data\n";
             cout<<errno<<endl<<strerror(errno);
             exit(EXIT_FAILURE);
         } else {
-            int dispatch_msg = pcap_dispatch(handle, 1, my_callback, (u_char *)this);
+            int dispatch_msg = pcap_dispatch(capDesc, 1, my_callback, (u_char *)this);
             //cout<<"dispatch msg: "<<dispatch_msg<<"\n";
             if(dispatch_msg  == -1){
                 cout<<"errr"<<endl;
                 return;
             } else if(dispatch_msg > 0){
                 cout<<"closing\n";
-                pcap_close(handle);
+                pcap_close(capDesc);
                 return;
             }else if(dispatch_msg == 0){
                 cout<<"time out\n";

@@ -296,34 +296,28 @@ void perform_scan(ps_args_t &ps_args) {
 				Scan sc = Scan();
 				sc.ipToScan = ip;
 				sc.port = htons(port);
-				sc.scanVector = vector<ScanType>();
 				switch (s) {
 				case SYN:
-					sc.scanVector.push_back(SYN);
 					sc.cScan = SYN;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, SYN);
 					break;
 				case NUL:
-					sc.scanVector.push_back(NUL);
 					sc.cScan = NUL;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, NUL);
 					break;
 				case FIN:
-					sc.scanVector.push_back(FIN);
 					sc.cScan = FIN;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, FIN);
 					break;
 				case XMAS:
-					sc.scanVector.push_back(XMAS);
 					sc.cScan = XMAS;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, XMAS);
 					break;
 				case ACK:
-					sc.scanVector.push_back(ACK);
 					sc.cScan = ACK;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, ACK);
