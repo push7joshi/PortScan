@@ -25,11 +25,11 @@ int connectToHost(string ipToScan, int port){
 
 
 string httpCheck(int clientSock){
-    char getRequest[20];
+    char getRequest[100];
     strcpy(getRequest,"GET / HTTP/1.1\r\nHOST: 129.79.247.86\r\n\r\n");
     //sendto(int socket, char data, int dataLength, flags, destinationAddress, int destinationStructureLength)
     int bytes_sent = send(clientSock, getRequest, strlen(getRequest), 0);
-    char rMsg[10240];
+    char rMsg[1024];
     int msgLen;
     while ((msgLen = recv(clientSock, rMsg, 1000, 0)) > 0) {
         string recvMsg(rMsg);

@@ -18,7 +18,6 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
         cout<<"errProto"<<endl;
     } else {
         proto = stringUpper(protoEntry->p_name);
-        cout<<proto<<endl;
     }
 
     Scan *mySelf = (Scan *)scanObj;
@@ -174,15 +173,10 @@ pcap_t* Scan::setupCapture(){
     if (pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1) {
         printf("\nError compiling.. quitting");
         exit(2);
-    } else {
-        cout << "compiled\n" << endl;
     }
-
     if (pcap_setfilter(handle, &filter) == -1) {
         printf("\nFilter err. Quit");
         exit(2);
-    } else {
-        cout << "filtered\n" << endl;
     }
     return handle;
 }
