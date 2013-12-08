@@ -21,6 +21,7 @@
 #include<algorithm>
 #include<vector>
 #include "helpers.h"
+#include "service.h"
 
 using namespace std;
 
@@ -43,6 +44,8 @@ typedef struct scanSpec{
     ScanType scan;
     short port;
 }scanObj;
+
+static vector<int> knownService{ 22,24,25,43,80,110,143,587};
 
 class Scan{
     public:

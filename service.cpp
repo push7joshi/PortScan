@@ -1,17 +1,4 @@
-#include<iostream>
-#include<cstdlib>
-#include<cstring>
-#include<stdio.h>
-#include<vector>
-#include <getopt.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fstream>
-#include<string>
-#ifndef RAW_H
-
-#define RAW_H
-#endif
+#include "service.h"
 
 using namespace std;
 
@@ -31,16 +18,13 @@ int connectToHost(string ipToScan, int port){
     }
     const struct sockaddr* sAddr = (struct sockaddr *)&sa;
     if(connect(clientSock, sAddr, sizeof(sa)) < 0){
-        cout<<"Could not connect to the host for service."<<endl;
-        exit(EXIT_FAILURE);
+        return -1;
     }
-    cout<<"Connected"<<endl;
     return clientSock;
 }
 
 
-string httpCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 80);
+string httpCheck(int clientSock){
     char getRequest[20];
     strcpy(getRequest,"GET / HTTP/1.1\r\nHOST: 129.79.247.86\r\n\r\n");
     //sendto(int socket, char data, int dataLength, flags, destinationAddress, int destinationStructureLength)
@@ -59,8 +43,7 @@ string httpCheck(string ipToScan){
     }
 }
 
-string smtpCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 25);
+string smtpCheck(int clientSock, string ipToScan){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1000, 0);
@@ -81,16 +64,14 @@ string smtpCheck(string ipToScan){
 }
 
 
-string sshCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 22);
+string sshCheck(int clientSock){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1024, 0);
     return string(rMsg);
 }
 
-string popCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 110);
+string popCheck(int clientSock){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1024, 0);
@@ -102,31 +83,30 @@ string popCheck(string ipToScan){
     }
 }
 
-string imapCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 143);
+string imapCheck(int clientSock){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1024, 0);
-    cout<<rMsg<<endl;
-    if(msgLen > 0){
-        return "IMAP in use";
+    if (msgLen < 0){
+        cout<<"Service Detection: Error while recieving."<<endl;
+    }
+    string resMsg(rMsg);
+    size_t pos = resMsg.find("IMAP");
+    if(pos != string::npos){
+        return resMsg.substr(pos, 10);
     } else {
         return string();
     }
 }
 
-string whoCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 43);
-
+string whoCheck(int clientSock, string ipToScan){
     char getRequest[20];
     char rMsg[1024];
     strcpy(getRequest,"google.com\n\n");
     //    strcat(getRequest, ipToScan.c_str());
     int requestLen = 5 + strlen(ipToScan.c_str());
-    cout<<getRequest<<endl;
     int bytes_sent = send(clientSock, &getRequest, 4, 0);
     int msgLen = recv(clientSock, rMsg, 1000, 0);
-    cout<<rMsg<<endl;
     if(msgLen > 0){
         return "WHOIS running";
     } else {
@@ -134,11 +114,11 @@ string whoCheck(string ipToScan){
     }
 }
 
-string privCheck(string ipToScan){
-    int clientSock = connectToHost(ipToScan, 24);
+string privCheck(int clientSock){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1024, 0);
+    cout<<rMsg<<endl;
     string service(rMsg);
     if(service.find("mailserver") != string::npos){
         return "Private mail sys in use";
@@ -147,7 +127,35 @@ string privCheck(string ipToScan){
     }
 }
 
-int main(void){
-   string result = popCheck("129.79.247.87");
-    cout<<"Check:"<<result<<endl;
+string servChk(string ipToScan, unsigned short port){
+    string result;
+    int clientSock = connectToHost(ipToScan, port);
+    if(clientSock < 0){
+        return string("Unknown");
+    }
+    switch(port){
+        case 80:
+            return httpCheck(clientSock);
+        case 22:
+            return sshCheck(clientSock);
+        case 24:
+            return privCheck(clientSock);
+        case 25:
+        case 587:
+            return smtpCheck(clientSock, ipToScan);
+        case 43:
+            return whoCheck(clientSock, ipToScan);
+        case 110:
+            return popCheck(clientSock);
+        case 143:
+            return imapCheck(clientSock);
+        default:
+            return "Unknown";
+    }
 }
+/*
+int main(int argc, char* argv[]){
+    unsigned short port = atoi(argv[1]);
+    cout<<servChk("129.79.247.87", port)<<endl;
+}*/
+

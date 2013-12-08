@@ -22,14 +22,17 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
     }
 
     Scan *mySelf = (Scan *)scanObj;
-
-    struct servent * service = getservbyport(mySelf->port, protoEntry->p_name);
     string serviceName;
-    if(service != NULL)
-        serviceName = stringUpper(service->s_name);
-    else
-        serviceName = "Not found.";
 
+    if(find(knownService.begin(), knownService.end(), ntohs(mySelf->port)) != knownService.end()){
+        serviceName = servChk(mySelf->ipToScan, ntohs(mySelf->port));
+    } else {
+        struct servent * service = getservbyport(mySelf->port, protoEntry->p_name);
+        if(service != NULL)
+            serviceName = stringUpper(service->s_name);
+        else
+            serviceName = "Not found.";
+    }
     cout<<"\nIP src:\t";
     char ackIp[30];
     string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
