@@ -23,8 +23,7 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
 
     Scan *mySelf = (Scan *)scanObj;
 
-
-    struct servent * service = getservbyport(htons(mySelf->port), protoEntry->p_name);
+    struct servent * service = getservbyport(mySelf->port, protoEntry->p_name);
     string serviceName;
     if(service != NULL)
         serviceName = stringUpper(service->s_name);
@@ -259,7 +258,7 @@ void Scan::runTcpScan()
     memset(&stSockAddr, 0, sizeof(stSockAddr));
 
     stSockAddr.sin_family = AF_INET;
-    stSockAddr.sin_port = htons(port);
+    stSockAddr.sin_port = port;
     stSockAddr.sin_addr.s_addr = inet_addr(ipToScan.c_str());
 
     char buffer[4096]; /* single packets are usually not bigger than 4096 bytes */
