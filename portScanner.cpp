@@ -8,11 +8,7 @@
 #include <arpa/inet.h>
 #include <fstream>
 #include <math.h>
-#ifndef RAW_H
-#define RAW_H
-#include "raw.h"
-#endif
-
+#include "scan.h"
 using namespace std;
 
 #define TCP_SYN 0
@@ -297,24 +293,25 @@ void perform_scan(ps_args_t &ps_args) {
 			if (ps_args.scans[s] == 1) {
 				cout << ip << "\t" << port << "\t" << ps_args.scans[s];
 				ScanType j;
+
 				switch (s) {
 				case SYN:
-					packetSendRecv(ip, port, SYN);
+					//packetSendRecv(ip, port, SYN);
 					break;
 				case NUL:
-					packetSendRecv(ip, port, NUL);
+					//packetSendRecv(ip, port, NUL);
 					break;
 				case FIN:
-					packetSendRecv(ip, port, FIN);
+					//packetSendRecv(ip, port, FIN);
 					break;
 				case XMAS:
-					packetSendRecv(ip, port, XMAS);
+					//packetSendRecv(ip, port, XMAS);
 					break;
 				case ACK:
-					packetSendRecv(ip, port, ACK);
+					//packetSendRecv(ip, port, ACK);
 					break;
 				case UDP:
-					packetSendRecvUDP(ip, port);
+					//packetSendRecvUDP(ip, port);
 					break;
 				}
 
