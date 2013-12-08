@@ -323,11 +323,12 @@ void * perform_scan(void * args) {
 				sc.ipToScan = ip;
 				sc.port = htons(port);
 				cout<<"------count-----------"<<ps_args->count++<<"\n";
-				sc.scanVector = vector<ScanType>();
+				//sc.scanVector = vector<ScanType>();
 				switch (s) {
 				case SYN:
 					//cout << "RUNNING SYN: " << ip << "\t port:" << port << "\n";
-					sc.scanVector.push_back(SYN);
+					//sc.scanVector.push_back(SYN);
+
 					sc.cScan = SYN;
 					sc.runTcpScan();
 					cout << "finished SYN: " << ip << "\t port:" << port
@@ -335,25 +336,21 @@ void * perform_scan(void * args) {
 					//packetSendRecv(ip, port, SYN);
 					break;
 				case NUL:
-					sc.scanVector.push_back(NUL);
 					sc.cScan = NUL;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, NUL);
 					break;
 				case FIN:
-					sc.scanVector.push_back(FIN);
 					sc.cScan = FIN;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, FIN);
 					break;
 				case XMAS:
-					sc.scanVector.push_back(XMAS);
 					sc.cScan = XMAS;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, XMAS);
 					break;
 				case ACK:
-					sc.scanVector.push_back(ACK);
 					sc.cScan = ACK;
 					sc.runTcpScan();
 					//packetSendRecv(ip, port, ACK);
