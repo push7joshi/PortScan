@@ -1,5 +1,5 @@
 #include "scan.h"
-
+#include <pthread.h>
 int timeout = 3000;
 int retries = 3;
 
@@ -24,6 +24,7 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
     Scan *mySelf = (Scan *)scanObj;
     string serviceName;
 
+	cout<<"working1223"<<endl;
     if(find(knownService.begin(), knownService.end(), ntohs(mySelf->port)) != knownService.end()){
         serviceName = servChk(mySelf->ipToScan, ntohs(mySelf->port));
     } else {
@@ -33,6 +34,7 @@ void Scan::my_callback(u_char* scanObj, const struct pcap_pkthdr* pkthdr,const u
         else
             serviceName = "Not found.";
     }
+	cout<<"working"<<endl;
     cout<<"\nIP src:\t";
     char ackIp[30];
     string ipToScan = string(inet_ntop(AF_INET, &(ipHeader->ip_src), ackIp, INET_ADDRSTRLEN));
@@ -149,7 +151,8 @@ pcap_t* Scan::setupCapture(){
     dev = pcap_lookupdev(errbuf); //get the device to capture packets
     if (dev == NULL) {
         printf("%s\n", errbuf);
-        exit(1);
+        pthread_exit(NULL);
+        //exit(1);
     }
 
     cout << dev << endl;
@@ -159,7 +162,8 @@ pcap_t* Scan::setupCapture(){
     handle = pcap_open_live(dev, BUFSIZ, 0, timeout, errbuf); //open the device for capture
     if (handle == NULL) {
         printf("pcap_open_live(): %s\n", errbuf);
-        exit(1);
+        pthread_exit(NULL);
+        //exit(1);
     }
 
     // Set the packet filter
@@ -173,14 +177,16 @@ pcap_t* Scan::setupCapture(){
     cout << "The filter expn is :" << filter_str << endl;
     if (pcap_compile(handle, &filter, filter_str.c_str(), 0, netp) == -1) {
         printf("\nError compiling.. quitting");
-        exit(2);
+        pthread_exit(NULL);
+//        exit(2);
     } else {
         cout << "compiled\n" << endl;
     }
 
     if (pcap_setfilter(handle, &filter) == -1) {
         printf("\nFilter err. Quit");
-        exit(2);
+        pthread_exit(NULL);
+        //        exit(2);
     } else {
         cout << "filtered\n" << endl;
     }
@@ -244,15 +250,18 @@ void Scan::createTcpPacket(char* packet, sockaddr_in &stSockAddr)
 void Scan::runTcpScan()
 {
     //helper
+	cout<<"running tcp:"<<ipToScan<<"\t"<<ntohs(port)<<"\n";
     bool liveHost = isAlive(ipToScan);
     if(!liveHost){
         cout<<"Could not reach host. It is possibly down or a wrong IP!"<<endl;
-        exit(EXIT_FAILURE);
+        pthread_exit(NULL);
+//        exit(EXIT_FAILURE);
     }
     int socketFD = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
     if(socketFD < 0){
         cout<<strerror(errno)<<endl;
-        exit(EXIT_FAILURE);
+        pthread_exit(NULL);
+//        exit(EXIT_FAILURE);
     }
 
     char destAddr[INET_ADDRSTRLEN];
@@ -264,7 +273,7 @@ void Scan::runTcpScan()
     stSockAddr.sin_port = port;
     stSockAddr.sin_addr.s_addr = inet_addr(ipToScan.c_str());
 
-    char buffer[4096]; /* single packets are usually not bigger than 4096 bytes */
+    char buffer[4096]; /* single packets are usu-+6ally not bigger than 4096 bytes */
     memset(buffer, 0, 4096);
 
     //Scan
@@ -276,16 +285,18 @@ void Scan::runTcpScan()
     if (i < 0){
         cout<<"Cannot set socket options\n";
     }
-
-    cout<<"Scanning IP "<<ipToScan<<"..."<<endl;
     //Scan
     pcap_t *handle = setupCapture();
     while(1){
+    	cout<<"will scan tcp:"<<ipToScan<<"\t"<<ntohs(port)<<"\n";
         if(sendto(socketFD, buffer, sizeof(struct ip) + sizeof(struct tcphdr), 0, (struct sockaddr *) &stSockAddr, sizeof(stSockAddr)) < 0){
             cout<<"\n\n\nError sending packet data\n";
             cout<<errno<<endl<<strerror(errno);
-            exit(EXIT_FAILURE);
+            return;
+            //exit(EXIT_FAILURE);
         } else {
+        	cout<<"done scanning will call tcp:"<<ipToScan<<"\t"<<ntohs(port)<<"\n";
+
             int dispatch_msg = pcap_dispatch(handle, 1, my_callback, (u_char *)this);
             //cout<<"dispatch msg: "<<dispatch_msg<<"\n";
             if(dispatch_msg  == -1){
@@ -298,7 +309,7 @@ void Scan::runTcpScan()
             }else if(dispatch_msg == 0){
                 cout<<"time out\n";
                 if(retries > 0){
-                    cout<<"retrying.... No of retries left"<<retries<<"\n";
+                    cout<<"retrying.... No of retries left"<<retries<<ntohs(port)<<"\n";
                     retries--;
                     continue;
                 }else{

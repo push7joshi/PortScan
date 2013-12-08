@@ -9,14 +9,10 @@
 #include <fstream>
 #include <math.h>
 #include "scan.h"
+#include<pthread.h>
 using namespace std;
 
-#define TCP_SYN 0
-#define TCP_NULL 1
-#define TCP_FIN 2
-#define TCP_XMAS 3
-#define TCP_ACK 4
-#define UDP_SCAN 5
+pthread_mutex_t cs_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
 struct ps_args_t {
 	vector<int> ports;
@@ -26,6 +22,7 @@ struct ps_args_t {
 	string prefix;
 	vector<int>::iterator port_iterator;
 	vector<string>::iterator ip_iterator;
+	int count;
 };
 
 void usage() {
@@ -44,6 +41,7 @@ void get_ports(vector<int> &ports, char* string) {
 	char * next;
 	while (1) {
 		int position = strtol(string, &next, 10);
+		cout << "--------------------->" << position << "\n";
 		//next++;
 		if (position == 0) {
 			break;
@@ -56,7 +54,7 @@ void get_ports(vector<int> &ports, char* string) {
 					ports.push_back(position);
 				} else {
 					int i;
-					for (i = prev; i < position; i++) {
+					for (i = prev; i <= position; i++) {
 						int j = i;
 						ports.push_back(j);
 					}
@@ -140,11 +138,20 @@ void parse_prefixes(ps_args_t &ps_args) {
 	 //printf("prefix: %d|%d|%d|%d|%d\n", ip_char[0],ip_char[1],ip_char[2],ip_char[3],ip_char[4],ip_char[5]);
 	 */
 }
+void get_default_ports(vector<int> &ports) {
+	cout << "default ports ++++++++++++++";
+	ports = vector<int>();
+	for (int i = 0; i <= 1024; i++) {
+		ports.push_back(i);
+	}
+}
 void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
-	ps_args.ports = vector<int>(1, -1);
 	ps_args.ip = vector<string>();
 	ps_args.num_threads = 1;
 	ps_args.prefix = string();
+	int port_set = 0;
+	int scans_flag = 0;
+	ps_args.count = 0;
 	memset(ps_args.scans, 0, sizeof(ps_args.scans));
 	//ps_args.scans = vector<string>();
 	/*
@@ -163,7 +170,6 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 					NULL, 'f' }, { "speedup", required_argument, NULL, 't' }, {
 					"scan", required_argument, NULL, 's' }, };
 	int ch;
-	int scans_flag = 0;
 	int option_index = 0;
 	string opt;
 	int curr = 0;
@@ -173,7 +179,6 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 		case 'h': //help
 			usage();
 			//cout << "h\n";
-			//exit(0);
 			break;
 		case 'i': //help
 				  //usage(stdout);
@@ -181,11 +186,9 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			inet_pton(AF_INET, optarg, &iaddr);
 			ps_args.ip.push_back(optarg);
 //			cout << "i " << ps_args.ip[0].s_addr << "\n";
-			//exit(0);
 			break;
 		case 'f': //help
 				  //usage(stdout);
-			//exit(0);
 			//cout<<"akjdnmakldas\n";
 			opt = optarg;
 			read_ip_from_file(ps_args.ip, optarg);
@@ -199,13 +202,14 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			parse_prefixes(ps_args);
 
 			//cout << "prfix " << ps_args.prefix << "\n";
-			//exit(0);
 			break;
 		case 'p': //help
 			//usage(stdout);
 
-			//cout << "included ports\n";
+			cout << "included ports" << optarg << "\n";
 			get_ports(ps_args.ports, optarg);
+			port_set = 1;
+//			cout << "adasdasdassdas : " << ps_args.ports[1] << "\n";
 			/*for (vector<int>::iterator it = ps_args.ports.begin();
 			 it != ps_args.ports.end(); ++it) {
 			 cout << " " << *it << " \n";
@@ -213,9 +217,10 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			break;
 		case 't': //help
 				  //usage(stdout);
-			ps_args.num_threads = 0;
+			//ps_args.num_threads = 0;
+			cout<<"setting threads\n";
 			ps_args.num_threads = strtol(optarg, NULL, 10);
-//			cout << "\nnum threads " << ps_args.num_threads << "\t" << optarg << "\n";
+			//cout << "\nnum threads " << ps_args.num_threads << "\t" << optarg << "\n";
 			break;
 		case 's': //help
 			//usage(stdout);
@@ -230,43 +235,60 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
 			 */
 			curr = optind - 1;
 			for (; curr < argc && argv[curr] != "-"; curr++) {
-				scans_flag = 0;
+				scans_flag = 1;
 				opt = optarg;
 				if (opt == "UDP") {
 					ps_args.scans[UDP] = 1;
 				} else if (optarg == "FIN") {
 					ps_args.scans[FIN] = 1;
 				} else if (opt == "SYN") {
-					ps_args.scans[TCP_SYN] = 1;
+					ps_args.scans[SYN] = 1;
 				} else if (opt == "XMAS") {
 					ps_args.scans[XMAS] = 1;
 				} else if (opt == "ACK") {
-					ps_args.scans[TCP_ACK] = 1;
-				} else if (opt == "NULL") {
-					ps_args.scans[TCP_NULL] = 1;
+					ps_args.scans[ACK] = 1;
+				} else if (opt == "NUL") {
+					ps_args.scans[NUL] = 1;
 				}
 			}
 			break;
 		default:
 			break;
 		}
-
+	}
+	if (port_set == 0) {
+		get_default_ports(ps_args.ports);
+	}
+	if (scans_flag == 0) {
+		for (int i = 0; i < 6; i++) {
+			ps_args.scans[i] = 1;
+		}
 	}
 }
 ;
 
 void get_next_ip_port(ps_args_t &ps_args, string &ip, int &port) {
 	//synchronized
+	pthread_mutex_lock(&cs_mutex);
 	ip = "finish";
 	port = -1;
 	while (1) {
 		if (ps_args.port_iterator == ps_args.ports.end()) {
+			if (ps_args.ip_iterator == ps_args.ip.end()) {
+				//end of queue..... no more jobs
+				cout << "end of ip list\n";
+				ps_args.port_iterator = ps_args.ports.end();
+				pthread_mutex_unlock(&cs_mutex);
+				return;
+			}
 			ps_args.ip_iterator++;
 			cout << "end of port list\n";
 			ps_args.port_iterator = ps_args.ports.begin();
 			if (ps_args.ip_iterator == ps_args.ip.end()) {
 				//end of queue..... no more jobs
 				cout << "end of ip list\n";
+				ps_args.port_iterator = ps_args.ports.end();
+				pthread_mutex_unlock(&cs_mutex);
 				return;
 			}
 		} else {
@@ -275,33 +297,41 @@ void get_next_ip_port(ps_args_t &ps_args, string &ip, int &port) {
 			port = *(ps_args.port_iterator);
 			ps_args.port_iterator++;
 			ps_args.ip_iterator;
+			pthread_mutex_unlock(&cs_mutex);
 			return;
 		}
+		pthread_mutex_unlock(&cs_mutex);
 	}
 	//end of synchronized
 }
 
-void perform_scan(ps_args_t &ps_args) {
+void * perform_scan(void * args) {
+	ps_args_t* ps_args = ((ps_args_t *) args);
 	string ip = "ip";
 	int port = 0;
 	while (ip != "finish" && port != -1) {
-		get_next_ip_port(ps_args, ip, port);
+		get_next_ip_port(*ps_args, ip, port);
+		cout << "about to start: " << ip << "\t port:" << port << "\n";
 		if (ip == "finish" && port == -1) {
-			break;
+			return NULL;
 		}
 		for (int s = 0; s < 6; s++) {
-			if (ps_args.scans[s] == 1) {
-				cout << ip << "\t" << port << "\t" << ps_args.scans[s];
+			if (ps_args->scans[s] == 1) {
+				cout << "really starting: " << ip << "\t port:" << port << "\n";
 				ScanType j;
 				Scan sc = Scan();
 				sc.ipToScan = ip;
 				sc.port = htons(port);
+				cout<<"------count-----------"<<ps_args->count++<<"\n";
 				sc.scanVector = vector<ScanType>();
 				switch (s) {
 				case SYN:
+					//cout << "RUNNING SYN: " << ip << "\t port:" << port << "\n";
 					sc.scanVector.push_back(SYN);
 					sc.cScan = SYN;
 					sc.runTcpScan();
+					cout << "finished SYN: " << ip << "\t port:" << port
+							<< "\n";
 					//packetSendRecv(ip, port, SYN);
 					break;
 				case NUL:
@@ -335,6 +365,7 @@ void perform_scan(ps_args_t &ps_args) {
 			}
 		}
 	}
+	return NULL;
 }
 int main(int argc, char * argv[]) {
 	ps_args_t ps_args;
@@ -342,15 +373,38 @@ int main(int argc, char * argv[]) {
 	ps_args.ip_iterator = ps_args.ip.begin();
 	//ps_args.ip_iterator = ps_args.ip_iterator+1;
 	ps_args.port_iterator = ps_args.ports.begin();
+	//ps_args.num_threads = 0;
 	//ps_args.port_iterator++;
-	vector<int>::iterator k = ps_args.ports.begin();
+	//vector<int>::iterator k = ps_args.ports.begin();
 
 	///cout<<"dasdasdafs"<<*(k)<<"\n";
 	//cout << "kgmblkdfmgod\n";
 //	/cout<<"skkdmasd"<<*(ps_args.ip.begin()+1)<<"\n";
 	//cout << "first" << *(ps_args.ip_iterator) << "\t\n";
 	//cout << *(ps_args.port_iterator) << "\n";
-	perform_scan(ps_args);
+	cout<<"the num threads in main"<<ps_args.num_threads<<"\n";
+	if (ps_args.num_threads > 0) {
+		cout<<"using thread"<<"\n";
+		pthread_t pth[ps_args.num_threads];
+		for (int i = 0; i < ps_args.num_threads; i++) {
+			pthread_create(&pth[i], NULL, perform_scan, &ps_args);
+		}
+//		pthread_create(&pth1, NULL, perform_scan, &ps_args);
+//		pthread_create(&pth2, NULL, perform_scan, &ps_args);
+//		pthread_create(&pth4, NULL, perform_scan, &ps_args);
+		//pthread_create(&pth1,NULL,perform_scan,&ps_args);
+		for (int i = 0; i < ps_args.num_threads; i++) {
+			pthread_join(pth[i], NULL);
+		}
+
+//		pthread_join(pth1, NULL);
+//		pthread_join(pth2, NULL);
+//		//pthread_join(pth3, NULL);
+//		pthread_join(pth4, NULL);
+	} else {
+		perform_scan(&ps_args);
+	}
+	//perform_scan(&ps_args);
 	/*for (vector<string>::iterator i = ps_args.ip.begin(); i != ps_args.ip.end();
 	 ++i) {
 
