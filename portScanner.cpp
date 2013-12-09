@@ -46,7 +46,6 @@ void get_ports(vector<int> &ports, char* string) {
     char * next;
     while (1) {
         int position = strtol(string, &next, 10);
-        cout << "--------------------->" << position << "\n";
         //next++;
         if (position == 0) {
             break;
@@ -210,7 +209,6 @@ void parse_args(ps_args_t &ps_args, int argc, char * argv[]) {
             case 'p': //help
                 //usage(stdout);
 
-                cout << "included ports" << optarg << "\n";
                 get_ports(ps_args.ports, optarg);
                 port_set = 1;
                 //          cout << "adasdasdassdas : " << ps_args.ports[1] << "\n";
@@ -280,17 +278,14 @@ void get_next_ip_port(ps_args_t &ps_args, string &ip, int &port) {
         if (ps_args.port_iterator == ps_args.ports.end()) {
             if (ps_args.ip_iterator == ps_args.ip.end()) {
                 //end of queue..... no more jobs
-                cout << "end of ip list\n";
                 ps_args.port_iterator = ps_args.ports.end();
                 pthread_mutex_unlock(&cs_mutex);
                 return;
             }
             ps_args.ip_iterator++;
-            cout << "end of port list\n";
             ps_args.port_iterator = ps_args.ports.begin();
             if (ps_args.ip_iterator == ps_args.ip.end()) {
                 //end of queue..... no more jobs
-                cout << "end of ip list\n";
                 ps_args.port_iterator = ps_args.ports.end();
                 pthread_mutex_unlock(&cs_mutex);
                 return;
@@ -549,9 +544,7 @@ int main(int argc, char * argv[]) {
     //  /cout<<"skkdmasd"<<*(ps_args.ip.begin()+1)<<"\n";
     //cout << "first" << *(ps_args.ip_iterator) << "\t\n";
     //cout << *(ps_args.port_iterator) << "\n";
-    cout<<"the num threads in main"<<ps_args.num_threads<<"\n";
     if (ps_args.num_threads > 0) {
-        cout<<"using thread"<<"\n";
         pthread_t pth[ps_args.num_threads];
         for (int i = 0; i < ps_args.num_threads; i++) {
             pthread_create(&pth[i], NULL, perform_scan, &ps_args);
