@@ -113,3 +113,17 @@ bool isAlive(string ipToScan){
     }
 }
 
+unsigned short in_cksum_udp(int src, int dst, unsigned short *addr, int len) {
+       struct psd_udp buf;
+       u_short ans;
+ 
+       memset(&buf, 0, sizeof(buf));
+       buf.src.s_addr = src;
+       buf.dst.s_addr = dst;
+       buf.pad = 0;
+       buf.proto = IPPROTO_UDP;
+       buf.udp_len = htons(len);
+       memcpy(&(buf.udp), addr, len);
+       ans = in_cksum((unsigned short *) &buf, 12 + len);
+       return (ans);
+}

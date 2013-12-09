@@ -14,6 +14,7 @@
 #include<string>
 #include<ifaddrs.h>
 #include<net/if.h>
+#include<netinet/udp.h>
 #include<algorithm>
 #include<vector>
 #ifndef HELPERS_H
@@ -30,6 +31,16 @@ struct psd_tcp {
     struct tcphdr tcp;
 };
 
+struct psd_udp {
+       struct in_addr src;
+       struct in_addr dst;
+       unsigned char pad;
+       unsigned char proto;
+       unsigned short udp_len;
+       struct udphdr udp;
+};
+
+
 string stringUpper(char * lString);
 struct in_addr getMyAddress();
 bool isAlive(string ipToScan);
@@ -37,6 +48,7 @@ struct in_addr getMyAddress();
 unsigned short csum(unsigned short *buf, int nwords);
 unsigned short in_cksum_tcp(int src, int dst, unsigned short *addr, int len);
 unsigned short in_cksum(unsigned short *addr, int len);
+unsigned short in_cksum_udp(int src, int dst, unsigned short *addr, int len);
 
 #endif
 

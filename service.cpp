@@ -134,7 +134,6 @@ string servChk(string ipToScan, unsigned short port){
     if(clientSock < 0){
         return string("Unknown");
     }
-cout<<"in service detection";
     switch(port){
         case 80:
             return httpCheck(clientSock);
