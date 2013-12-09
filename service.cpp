@@ -54,7 +54,6 @@ string smtpCheck(int clientSock, string ipToScan){
     int requestLen = 5 + strlen(ipToScan.c_str());
     int bytes_sent = send(clientSock, getRequest, strlen(getRequest), 0);
     msgLen = recv(clientSock, rMsg, 1000, 0);
-    cout<<rMsg<<endl;
     string recvMsg(rMsg);
 
     if (recvMsg.find("250") != string::npos) {
@@ -119,7 +118,6 @@ string privCheck(int clientSock){
     char rMsg[1024];
     memset(rMsg, 0, sizeof(rMsg));
     int msgLen = recv(clientSock, rMsg, 1024, 0);
-    cout<<rMsg<<endl;
     string service(rMsg);
     if(service.find("mailserver") != string::npos){
         return "Private mail sys in use";
