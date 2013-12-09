@@ -486,9 +486,10 @@ void interpretResults(){
             for (listIter = portList.begin(); listIter != portList.end(); ++listIter) {
                 //  if present add scan to vector
                 if(listIter->first == scannedPort){
-                    vector<PortState> portSt = listIter->second;
+             /*       vector<PortState> portSt = listIter->second;
                     portSt[scan] = scanResult;
-                    listIter->second = portSt;
+                    listIter->second = portSt;*/
+                    break;
                 }
             }
             //  else add new pair;
@@ -503,7 +504,16 @@ void interpretResults(){
                 //append to the list
                 portList.push_back(portResult);
                 resultMap[scannedIp]= portList;
-            }
+            } else
+            {
+                    vector<PortState> portSt = listIter->second;
+                    portSt[scan] = scanResult;
+                    listIter->second = portSt;
+                   
+                    pair<short, vector<PortState> > portResult (scannedPort, portSt);
+                    *(listIter)=portResult;
+                    resultMap[scannedIp]= portList;
+             }
         } else { //IP not present in the map.
             //Create entries
             //create Port state vector
